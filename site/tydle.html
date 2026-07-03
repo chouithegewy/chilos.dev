@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tydle mp3 deck — chilos.dev</title>
+<meta name="description" content="A YouTube-to-mp3 deck built on tydle, a Rust/WASM YouTube extractor.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Archivo:wght@400;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="/">chilos<span>.</span>dev</a>
+    <span class="spacer"></span>
+    <a class="tab" href="/">repos</a>
+    <a class="tab" href="/tydle.html" aria-current="page">tydle deck</a>
+    <a class="tab" href="/#contact">contact</a>
+  </nav>
+
+  <article class="project">
+    <h1>tydle <em>/</em> mp3 deck</h1>
+    <p class="lede">A hosted web app: paste a YouTube video or playlist link, get the
+    highest-quality mp3 of every track — powered by a Rust YouTube extractor
+    compiled to WebAssembly.</p>
+    <p class="launch"><a href="/tydle/">Open the live deck</a></p>
+
+    <h2>What it is</h2>
+    <p><a href="https://github.com/Dev-Siri/tydle">tydle</a> is a YouTube video
+    extractor written in Rust — a small subset of yt-dlp that runs natively or in
+    any JavaScript runtime via wasm. The deck is a zero-dependency Node server on
+    top of it: tydle (as a wasm module) extracts the streams, the server picks the
+    best audio-only stream, and <code>ffmpeg</code> transcodes it to mp3 at LAME's
+    highest VBR quality, streamed straight to the browser.</p>
+
+    <h2>Details it gets right</h2>
+    <p>YouTube paces plain downloads to roughly twice the media bitrate — a
+    53-minute mix would take 25 minutes. The deck fetches sources in 10&nbsp;MiB
+    <code>Range</code> chunks instead, which YouTube serves at full speed: same
+    file, 38 seconds.</p>
+    <p>Playlists (including auto-generated radio mixes) are enumerated from the
+    page data and downloaded sequentially with per-track progress and a live
+    ETA. Piped mp3 can't carry a Xing VBR header, so each file gets an exact
+    ID3 <code>TLEN</code> tag instead — players still show the right duration.
+    Title and artist tags come along for free.</p>
+
+    <h2>How it's hosted</h2>
+    <p>YouTube bot-checks requests from datacenter IPs — every innertube client
+    returns <em>“Sign in to confirm you're not a bot”</em>, so extraction fails
+    outright from a VPS. A Proof-of-Origin token (BotGuard attestation) isn't
+    enough to lift an IP-level block.</p>
+    <p>So the deck doesn't extract on the server. <a href="/tydle/">chilos.dev/tydle/</a>
+    is an <code>nginx</code> reverse proxy on the VPS that forwards over a
+    persistent reverse SSH tunnel to the deck running on a machine at home — so
+    the YouTube requests originate from a residential IP that isn't flagged. The
+    VPS only ever sees the finished mp3 stream on its way to your browser.</p>
+
+    <h2>Run it</h2>
+    <p>The live deck runs at <a href="/tydle/">chilos.dev/tydle/</a>. To run it
+    locally, build the wasm package with <code>wasm-pack</code>, run
+    <code>node server.js</code>, then paste a link.</p>
+  </article>
+
+  <footer>
+    <span>© <span id="yr"></span> David Childs</span>
+    <span><a href="https://github.com/chouithegewy">github</a></span>
+    <span><a href="mailto:combatburrito@gmail.com">email</a></span>
+    <span><a href="/">all repos</a></span>
+  </footer>
+</div>
+<script>document.getElementById("yr").textContent = new Date().getFullYear();</script>
+</body>
+</html>
