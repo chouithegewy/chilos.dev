@@ -131,6 +131,78 @@ ul.crates .date { font-family: var(--mono); font-size: 12px; color: var(--dim); 
 .project p { max-width: 660px; margin-bottom: 12px; }
 .project code { font-family: var(--mono); font-size: 0.9em; background: #dde4ea; padding: 1px 5px; border-radius: 4px; }
 
+/* Interactive repo rows: hover previews a README, click pins it. */
+section.repos ul.crates li { cursor: pointer; transition: background 0.12s ease; }
+section.repos ul.crates li:hover { background: rgba(62, 92, 118, 0.07); }
+section.repos ul.crates li.active { background: rgba(196, 80, 27, 0.09); }
+
+/* README reader pane — echoes the manifest's dark terminal card. */
+#readme-pane {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(480px, 92vw);
+  display: flex;
+  flex-direction: column;
+  background: #1d2833;
+  color: #cdd9e3;
+  box-shadow: -18px 0 44px rgba(23, 34, 43, 0.32);
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 50;
+}
+#readme-pane.open { transform: translateX(0); }
+@media (prefers-reduced-motion: reduce) { #readme-pane { transition: none; } }
+
+.rp-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 16px;
+  border-bottom: 1px solid #33475a;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.rp-path {
+  color: #dbe4ec;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-path::before { content: "~/"; color: #63798c; font-weight: 400; }
+.rp-tag {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #63798c;
+}
+#readme-pane.pinned .rp-tag { color: #f0a06c; }
+.rp-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #8fa8bd;
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+.rp-close:hover { color: #ffc39a; background: #121a22; }
+.rp-body { flex: 1; min-height: 0; display: flex; }
+.rp-frame { flex: 1; width: 100%; height: 100%; border: none; background: #1d2833; }
+.rp-msg {
+  margin: auto;
+  padding: 24px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: #8fa8bd;
+  text-align: center;
+}
+@media (max-width: 620px) { #readme-pane { width: 100vw; } }
+
 footer {
   margin-top: 48px;
   padding: 24px 0 40px;
