@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tydle · mp3 deck</title>
+<style>
+  :root {
+    --bg: #0e2a28;
+    --panel: #123734;
+    --panel-2: #0b201e;
+    --line: #1e4a45;
+    --text: #e8f0ec;
+    --muted: #86a69e;
+    --amber: #ffb454;
+    --peak: #ff6b4a;
+    --ok: #7ed491;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background-image: radial-gradient(ellipse at 50% -20%, #16403c 0%, var(--bg) 60%);
+  }
+  main { width: 100%; max-width: 560px; }
+
+  .deck {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+    overflow: hidden;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 15px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; }
+  header h1 span { color: var(--amber); }
+  header .tag { font-size: 11px; color: var(--muted); letter-spacing: .12em; }
+
+  .io { padding: 22px; }
+  label { display: block; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  form { display: flex; gap: 10px; }
+  input[type="url"] {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    padding: 12px 14px;
+  }
+  input[type="url"]::placeholder { color: #4f6d66; }
+  input[type="url"]:focus-visible, button:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+  button {
+    background: var(--amber);
+    color: #241503;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 12px 18px;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.ghost { background: transparent; color: var(--amber); border: 1px solid var(--line); }
+
+  .msg { margin: 0 22px 18px; font-size: 13px; color: var(--peak); min-height: 1em; overflow-wrap: anywhere; }
+  .msg:empty { margin-bottom: 0; }
+
+  .track {
+    display: none;
+    gap: 16px;
+    padding: 20px 22px;
+    border-top: 1px solid var(--line);
+  }
+  .track.on { display: flex; }
+  .track img {
+    width: 128px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .track .meta { flex: 1; min-width: 0; }
+  .track h2 { font-size: 14px; line-height: 1.45; font-weight: 600; margin-bottom: 6px; overflow-wrap: anywhere; }
+  .track .specs { font-size: 11px; color: var(--muted); letter-spacing: .06em; line-height: 1.8; }
+  .track .specs b { color: var(--amber); font-weight: 600; }
+  .track .rip { margin-top: 12px; }
+
+  /* Playlist */
+  .playlist { display: none; border-top: 1px solid var(--line); }
+  .playlist.on { display: block; }
+  .playlist .plhead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 22px 12px;
+  }
+  .playlist .plhead h3 { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; overflow-wrap: anywhere; }
+  .playlist .plhead h3 b { color: var(--text); }
+  .playlist ol {
+    list-style: none;
+    max-height: 260px;
+    overflow-y: auto;
+    border-top: 1px solid var(--line);
+  }
+  .playlist li {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    padding: 8px 22px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-bottom: 1px solid rgba(30,74,69,.4);
+  }
+  .playlist li .n { color: var(--muted); min-width: 2.5em; text-align: right; }
+  .playlist li .t { flex: 1; overflow-wrap: anywhere; }
+  .playlist li .st { color: var(--muted); white-space: nowrap; }
+  .playlist li.done .st { color: var(--ok); }
+  .playlist li.fail .st { color: var(--peak); }
+  .playlist li.active { background: var(--panel-2); }
+  .playlist li.active .st { color: var(--amber); }
+
+  /* VU meter + progress counter */
+  .vu {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 34px;
+    padding: 14px 22px 10px;
+    border-top: 1px solid var(--line);
+  }
+  .vu i { flex: 1; height: 15%; background: #1c443f; border-radius: 1px; }
+  .vu.live i { background: var(--amber); animation: vu 640ms ease-in-out infinite alternate; }
+  .vu.live i:nth-child(4n)   { animation-duration: 500ms; }
+  .vu.live i:nth-child(4n+1) { animation-duration: 760ms; animation-delay: -200ms; }
+  .vu.live i:nth-child(4n+2) { animation-duration: 590ms; animation-delay: -420ms; }
+  .vu.live i:nth-child(7n)   { background: var(--peak); }
+  @keyframes vu { from { height: 12%; } to { height: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .vu.live i { animation: none; height: 60%; } }
+
+  .counter { padding: 0 22px 18px; }
+  .bar {
+    height: 8px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .bar > div {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--amber), var(--peak));
+    transition: width .3s linear;
+  }
+  .counter .stats {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    min-height: 1.2em;
+  }
+  .counter .stats .pct { color: var(--amber); }
+
+  footer { margin-top: 14px; text-align: center; font-size: 11px; color: #4f6d66; letter-spacing: .08em; }
+  @media (max-width: 480px) {
+    form { flex-direction: column; }
+    .track { flex-direction: column; }
+    .track img { width: 100%; height: auto; aspect-ratio: 16/9; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="deck">
+    <header>
+      <h1>tydle <span>/</span> mp3 deck</h1>
+      <div class="tag">MPEG-1 L3 · VBR Q0</div>
+    </header>
+
+    <div class="io">
+      <label for="url">YouTube link — video or playlist</label>
+      <form id="form">
+        <input id="url" type="url" placeholder="https://youtu.be/…" autocomplete="off" spellcheck="false" required autofocus>
+        <button id="load" type="submit">Load</button>
+      </form>
+    </div>
+
+    <p class="msg" id="msg" role="alert"></p>
+
+    <div class="track" id="track">
+      <img id="thumb" alt="" hidden>
+      <div class="meta">
+        <h2 id="title"></h2>
+        <div class="specs" id="specs"></div>
+        <button class="rip" id="rip" type="button">Download MP3</button>
+      </div>
+    </div>
+
+    <div class="playlist" id="playlist">
+      <div class="plhead">
+        <h3 id="plTitle"></h3>
+        <button id="ripAll" type="button">Download all</button>
+      </div>
+      <ol id="plList"></ol>
+    </div>
+
+    <div class="vu" id="vu" aria-hidden="true"></div>
+    <div class="counter">
+      <div class="bar"><div id="fill"></div></div>
+      <div class="stats">
+        <span id="stLeft"></span>
+        <span class="pct" id="stPct"></span>
+        <span id="stRight"></span>
+      </div>
+    </div>
+  </div>
+  <footer>local only · streams via tydle (wasm) · transcode via ffmpeg</footer>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const vu = $("vu");
+  for (let i = 0; i < 36; i++) vu.appendChild(document.createElement("i"));
+
+  let current = null;   // { url } for single video
+  let playlist = null;  // { videos: [{videoId, title}] }
+  let busy = false;
+
+  const fmtMB = (b) => (b / 1048576).toFixed(1) + " MB";
+  const fmtTime = (s) => {
+    if (!isFinite(s) || s < 0) return "–:––";
+    const m = Math.floor(s / 60), sec = String(Math.round(s % 60)).padStart(2, "0");
+    return `${m}:${sec}`;
+  };
+  const fmtDuration = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  function setBusy(on, label) {
+    busy = on;
+    vu.classList.toggle("live", on);
+    $("load").disabled = on;
+    $("rip").disabled = on;
+    $("ripAll").disabled = on;
+    setProgress(on ? 0 : null, label ?? "");
+  }
+
+  // pct null clears the bar; label goes bottom-left, detail bottom-right
+  function setProgress(pct, label, detail) {
+    $("fill").style.width = pct == null ? "0%" : Math.min(pct * 100, 99) + "%";
+    $("stLeft").textContent = label ?? "";
+    $("stPct").textContent = pct == null ? "" : Math.min(Math.round(pct * 100), 99) + "%";
+    $("stRight").textContent = detail ?? "";
+  }
+
+  // Streams a download, driving the progress bar from the server's mp3-size
+  // estimate, then saves the file. Returns the filename.
+  async function downloadOne(videoUrl, label) {
+    const res = await fetch(`api/download?url=${encodeURIComponent(videoUrl)}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? `Download failed (HTTP ${res.status}).`);
+    }
+    const estimate = Number(res.headers.get("X-Estimated-Content-Length")) || 0;
+    const cd = res.headers.get("Content-Disposition") ?? "";
+    const filename = decodeURIComponent(cd.match(/filename\*=UTF-8''(.+)$/)?.[1] ?? "audio.mp3");
+
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+    let rate = 0;
+    let lastT = performance.now(), lastB = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      const now = performance.now();
+      if (now - lastT > 500) {
+        const inst = (received - lastB) / ((now - lastT) / 1000);
+        rate = rate ? rate * 0.7 + inst * 0.3 : inst; // smoothed
+        lastT = now; lastB = received;
+        const eta = estimate > received && rate > 0 ? (estimate - received) / rate : NaN;
+        setProgress(
+          estimate ? received / estimate : 0,
+          label,
+          `${fmtMB(received)}${estimate ? " / ~" + fmtMB(estimate) : ""} · ${fmtTime(eta)} left`
+        );
+      }
+    }
+    const blob = new Blob(chunks, { type: "audio/mpeg" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return filename;
+  }
+
+  function renderPlaylist(pl) {
+    $("plTitle").innerHTML = `<b>${pl.videos.length}</b> tracks${pl.title ? " · " + pl.title : ""}`;
+    const ol = $("plList");
+    ol.innerHTML = "";
+    pl.videos.forEach((v, i) => {
+      const li = document.createElement("li");
+      li.id = `pl-${v.videoId}`;
+      li.innerHTML = `<span class="n">${i + 1}</span><span class="t"></span><span class="st"></span>`;
+      li.querySelector(".t").textContent = v.title;
+      ol.appendChild(li);
+    });
+    $("playlist").classList.add("on");
+  }
+
+  $("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const url = $("url").value.trim();
+    $("msg").textContent = "";
+    $("track").classList.remove("on");
+    $("playlist").classList.remove("on");
+    current = null;
+    playlist = null;
+    setBusy(true, "reading tape…");
+    try {
+      const hasList = /[?&]list=/.test(url);
+      const hasVideo = /(youtu\.be\/|[?&]v=|shorts\/|embed\/|live\/)/.test(url);
+
+      if (hasVideo) {
+        const res = await fetch(`api/info?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        current = { url };
+        $("thumb").src = data.thumbnail ?? "";
+        $("thumb").hidden = !data.thumbnail;
+        $("title").textContent = data.title;
+        $("specs").innerHTML =
+          `${data.channel ?? "unknown channel"} · ${fmtDuration(data.duration)}<br>` +
+          `source <b>${data.source.codec}</b> ${data.source.kbps} kbps → mp3 <b>~245 kbps VBR</b>`;
+        $("track").classList.add("on");
+      }
+      if (hasList) {
+        const res = await fetch(`api/playlist?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        if (!res.ok) {
+          if (!hasVideo) throw new Error(data.error);
+        } else {
+          playlist = data;
+          renderPlaylist(data);
+        }
+      }
+      if (!hasVideo && !hasList) throw new Error("That doesn't look like a YouTube link. Paste a youtube.com or youtu.be URL.");
+    } catch (err) {
+      $("msg").textContent = err.message;
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  $("rip").addEventListener("click", async () => {
+    if (!current || busy) return;
+    $("msg").textContent = "";
+    setBusy(true, "ripping…");
+    try {
+      await downloadOne(current.url, "ripping…");
+      setProgress(1, "saved", "");
+      $("fill").style.width = "100%";
+    } catch (err) {
+      $("msg").textContent = err.message;
+      setProgress(null, "");
+    } finally {
+      busy = false;
+      vu.classList.remove("live");
+      $("load").disabled = $("rip").disabled = $("ripAll").disabled = false;
+    }
+  });
+
+  $("ripAll").addEventListener("click", async () => {
+    if (!playlist || busy) return;
+    $("msg").textContent = "";
+    setBusy(true, "");
+    let failed = 0;
+    try {
+      for (let i = 0; i < playlist.videos.length; i++) {
+        const v = playlist.videos[i];
+        const li = $(`pl-${v.videoId}`);
+        li.classList.add("active");
+        li.querySelector(".st").textContent = "ripping";
+        li.scrollIntoView({ block: "nearest" });
+        try {
+          await downloadOne(
+            `https://www.youtube.com/watch?v=${v.videoId}`,
+            `track ${i + 1} of ${playlist.videos.length}`
+          );
+          li.classList.add("done");
+          li.querySelector(".st").textContent = "saved";
+        } catch (err) {
+          failed++;
+          li.classList.add("fail");
+          li.querySelector(".st").textContent = "failed";
+        }
+        li.classList.remove("active");
+      }
+      setProgress(1, "playlist done", failed ? `${failed} failed` : "");
+      $("fill").style.width = "100%";
+      if (failed) $("msg").textContent = `${failed} track(s) failed — see the list.`;
+    } finally {
+      busy = false;
+      vu.classList.remove("live");
+      $("load").disabled = $("rip").disabled = $("ripAll").disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

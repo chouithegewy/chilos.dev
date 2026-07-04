@@ -1,8 +1,11 @@
 #!/usr/bin/env sh
 # Deploy the static site to the chilos.dev server.
 #
-# Adjust HOST (ssh user@host) and DOCROOT (where nginx should serve from),
-# then run: ./deploy.sh
+# Usage: ./deploy.sh <ssh-user@host> [docroot]
+# e.g.:  ./deploy.sh you@example.com /var/www/chilos.dev
+#
+# HOST (ssh user@host) is required. DOCROOT defaults to /var/www/chilos.dev.
+# The docroot is typically root-owned, so you may need --rsync-path="sudo rsync".
 #
 # The current chilos.dev responds 405 to HEAD, which suggests nginx is
 # proxying to an app server rather than serving static files. To serve this
@@ -17,7 +20,7 @@
 #
 set -eu
 
-HOST="${1:-david@45.32.95.66}"
+HOST="${1:?usage: ./deploy.sh <ssh-user@host> [docroot]}"
 DOCROOT="${2:-/var/www/chilos.dev}"
 
 ssh "$HOST" "mkdir -p '$DOCROOT'"
