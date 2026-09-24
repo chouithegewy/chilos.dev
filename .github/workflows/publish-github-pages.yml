@@ -1,0 +1,43 @@
+# Publish site/ to https://chouithegewy.github.io on every push or merge to main.
+# Auth: PAGES_DEPLOY_KEY is the private half of a write deploy key on the
+# chouithegewy.github.io repo (it can write to that repo only).
+name: Publish to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/publish-github-pages.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-github-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: chouithegewy/chouithegewy.github.io
+          ssh-key: ${{ secrets.PAGES_DEPLOY_KEY }}
+          path: pages
+
+      - name: Sync site/ into the Pages repo (frogger3d/ is left alone)
+        run: |
+          rsync -a --delete \
+            --exclude .git --exclude frogger3d/ \
+            --exclude .nojekyll --exclude .gitattributes --exclude .gitignore \
+            site/ pages/
+          cd pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Pages repo already up to date."
+            exit 0
+          fi
+          git commit -m "Publish site from chouithegewy/chilos.dev@${GITHUB_SHA::7}"
+          git push

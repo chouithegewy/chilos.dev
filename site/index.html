@@ -3,229 +3,83 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>chilos.dev — David Childs</title>
-<meta name="description" content="David Childs — systems-minded developer. Index of everything I've built on GitHub.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Archivo:wght@400;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<title>David Childs</title>
+<meta name="description" content="David Childs, computer science student at Cal State LA, building vr_fire, a VR wildfire simulator capstone.">
+<style>
+  :root {
+    --bg: #e4e2e7;
+    --text: #57525e;
+    --dim: #86808d;
+    --rule: #d3cfd8;
+    --purple: #7b5e9c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #252228;
+      --text: #a7a1ae;
+      --dim: #7a7481;
+      --rule: #3a3540;
+      --purple: #a58bc4;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    color: var(--text);
+    font: 18px/1.65 Charter, "Bitstream Charter", "Iowan Old Style", "Sitka Text", Cambria, Georgia, serif;
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: 18vh 1.5rem 12vh;
+  }
+  h1 { font-size: 1.25em; font-weight: 400; }
+  h2 { font-size: 1.4em; font-weight: 400; color: var(--purple); }
+  p { margin-top: 0.6rem; }
+  a { color: var(--purple); text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+  a:hover { text-decoration-thickness: 2px; }
+  a:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; border-radius: 2px; }
+  ::selection { background: var(--purple); color: var(--bg); }
+  .me p { color: var(--dim); margin-top: 0.15rem; }
+  .capstone {
+    margin: 3.2rem 0;
+    padding-left: 1.25rem;
+    border-left: 2px solid var(--purple);
+  }
+  .capstone p { font-size: 1.05em; }
+  .capstone .links { margin-top: 1rem; }
+  .capstone .links a { margin-right: 1.25rem; white-space: nowrap; }
+  .side { color: var(--dim); }
+  .contact {
+    margin-top: 3.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+    color: var(--dim);
+  }
+  .contact a { margin-right: 1.25rem; }
+</style>
 </head>
 <body>
-<div class="wrap">
-  <nav>
-    <a class="brand" href="/">chilos<span>.</span>dev</a>
-    <span class="spacer"></span>
-    <a class="tab" href="/" aria-current="page">repos</a>
-    <a class="tab" href="/tydle.html">tydle deck</a>
-    <a class="tab" href="#contact">contact</a>
-  </nav>
+<header class="me">
+  <h1>David Childs</h1>
+  <p>Computer science student at Cal State LA.</p>
+</header>
 
-  <header class="hero">
-    <h1>David Childs builds <em>systems</em> — mostly in Rust, occasionally against his will in Java.</h1>
-    <p class="sub">Everything below is real, public, and linked. Protocol implementations, crypto coursework, a chess variant, a Twitch TUI, and one YouTube extractor with a tape-deck face.</p>
+<main>
+  <section class="capstone" aria-labelledby="vr-fire">
+    <h2 id="vr-fire">vr_fire</h2>
+    <p>My capstone project: a VR wildfire simulator for California, part of a larger effort that uses machine learning to predict where a fire will spread.</p>
+    <p>I'm building the terrain. It turns USGS elevation data into 3D ground on the same 30&nbsp;m grid the model predicts on, so a forecast lines up with the hills it's burning across.</p>
+    <p class="links">
+      <a href="https://chilos.dev/vr_fire/">Drive the terrain in your browser</a>
+      <a href="https://github.com/chouithegewy/vr_fire">Source on GitHub</a>
+    </p>
+  </section>
 
-    <pre class="manifest" id="contact"><span class="sec">[package]</span>
-<span class="k">name</span> <span class="eq">=</span> <span class="v">"chilos"</span>
-<span class="k">authors</span> <span class="eq">=</span> <span class="v">["David Childs"]</span>
-<span class="k">repositories</span> <span class="eq">=</span> <span class="v" id="repo-count">"22"</span> <span class="c"># all listed below</span>
+  <p class="side">On the side, I'm fiddling with getting Super Smash Bros. Melee running natively in the browser with wasm. <a href="https://chilos.dev/ssbm/">Where it's at</a>.</p>
+</main>
 
-<span class="sec">[contact]</span>
-<span class="k">github</span> <span class="eq">=</span> <a href="https://github.com/chouithegewy">"github.com/chouithegewy"</a>
-<span class="k">email</span> <span class="eq">=</span> <a href="mailto:combatburrito@gmail.com">"combatburrito@gmail.com"</a>
-<span class="k">facebook</span> <span class="eq">=</span> <a href="https://facebook.com/chilos">"facebook.com/chilos"</a>
-<span class="k">instagram</span> <span class="eq">=</span> <a href="https://instagram.com/chilos.dev">"@chilos.dev"</a></pre>
-  </header>
-
-  <section class="repos" id="repos"></section>
-
-  <footer>
-    <span>© <span id="yr"></span> David Childs</span>
-    <span><a href="https://github.com/chouithegewy">github</a></span>
-    <span><a href="mailto:combatburrito@gmail.com">email</a></span>
-    <span><a href="/tydle.html">tydle deck</a></span>
-  </footer>
-</div>
-
-<aside id="readme-pane" aria-hidden="true" aria-label="Repository README">
-  <header class="rp-bar">
-    <span class="rp-path" id="rp-path">readme</span>
-    <span class="rp-tag" id="rp-tag"></span>
-    <button class="rp-close" id="rp-close" type="button" aria-label="Close README">&times;</button>
-  </header>
-  <div class="rp-body" id="rp-body"></div>
-</aside>
-
-<script id="repo-data" type="application/json">[{"description":"rust implementation of the one billion row challenge","fork":false,"html_url":"https://github.com/chouithegewy/1brc","language":"Rust","name":"1brc","stargazers_count":0,"updated_at":"2025-11-14T23:39:49Z"},{"description":null,"fork":false,"html_url":"https://github.com/chouithegewy/adventofcode","language":"Rust","name":"adventofcode","stargazers_count":0,"updated_at":"2026-03-02T18:06:35Z"},{"description":"A very simple application level protocol - Project 2 - Network Protocols - CS4470","fork":false,"html_url":"https://github.com/chouithegewy/a_very_simple_application_level_protocol","language":"Rust","name":"a_very_simple_application_level_protocol","stargazers_count":0,"updated_at":"2026-04-27T06:51:10Z"},{"description":"blind fold random chess","fork":false,"html_url":"https://github.com/chouithegewy/bfrc","language":"Rust","name":"bfrc","stargazers_count":0,"updated_at":"2025-10-24T03:00:53Z"},{"description":"Twitch TUI app to minimize CPU usage while streaming (over having a browser open with chat)","fork":false,"html_url":"https://github.com/chouithegewy/choui-the-no-gui-chatbot","language":"Rust","name":"choui-the-no-gui-chatbot","stargazers_count":0,"updated_at":"2026-01-25T16:37:25Z"},{"description":null,"fork":false,"html_url":"https://github.com/chouithegewy/chouithegewy.github.io","language":"HTML","name":"chouithegewy.github.io","stargazers_count":0,"updated_at":"2026-05-08T22:52:35Z"},{"description":"crs mu","fork":false,"html_url":"https://github.com/chouithegewy/crsmu","language":null,"name":"crsmu","stargazers_count":0,"updated_at":"2026-06-28T00:11:43Z"},{"description":null,"fork":false,"html_url":"https://github.com/chouithegewy/cs3220_sample_midterm","language":"Java","name":"cs3220_sample_midterm","stargazers_count":0,"updated_at":"2025-07-10T23:54:50Z"},{"description":"First project in CS3338","fork":false,"html_url":"https://github.com/chouithegewy/CS3338-first-project","language":"HTML","name":"CS3338-first-project","stargazers_count":0,"updated_at":"2026-01-30T20:27:54Z"},{"description":"Group 4 HOME PAGE","fork":false,"html_url":"https://github.com/chouithegewy/CS3338-Group4","language":null,"name":"CS3338-Group4","stargazers_count":0,"updated_at":"2026-02-20T15:21:50Z"},{"description":null,"fork":true,"html_url":"https://github.com/chouithegewy/CS3338-Homework-1","language":null,"name":"CS3338-Homework-1","stargazers_count":0,"updated_at":"2026-02-13T21:22:09Z"},{"description":"SECOND PROJECT","fork":true,"html_url":"https://github.com/chouithegewy/CS3338-second-project","language":"HTML","name":"CS3338-second-project","stargazers_count":0,"updated_at":"2026-02-16T22:16:07Z"},{"description":"sdes implementation - CS4780 - educational algorithm","fork":false,"html_url":"https://github.com/chouithegewy/des","language":"Java","name":"des","stargazers_count":0,"updated_at":"2026-05-04T05:13:41Z"},{"description":"my web site","fork":false,"html_url":"https://github.com/chouithegewy/dev.chilos.www","language":"Java","name":"dev.chilos.www","stargazers_count":0,"updated_at":"2026-03-13T20:57:34Z"},{"description":"network protocols - prj 1","fork":false,"html_url":"https://github.com/chouithegewy/distributed_async_vec_routing","language":"Java","name":"distributed_async_vec_routing","stargazers_count":0,"updated_at":"2026-04-30T15:34:17Z"},{"description":"sys setup ","fork":false,"html_url":"https://github.com/chouithegewy/dotfiles","language":"Shell","name":"dotfiles","stargazers_count":0,"updated_at":"2026-06-08T19:49:34Z"},{"description":null,"fork":false,"html_url":"https://github.com/chouithegewy/interactive_study","language":"Rust","name":"interactive_study","stargazers_count":0,"updated_at":"2026-05-14T17:07:04Z"},{"description":"Web - Rust, Typescript, Docker, NGINX","fork":false,"html_url":"https://github.com/chouithegewy/michaelchilds.dev","language":"Rust","name":"michaelchilds.dev","stargazers_count":0,"updated_at":"2026-01-13T23:39:39Z"},{"description":null,"fork":false,"html_url":"https://github.com/chouithegewy/nsf_research_open_siem","language":"Python","name":"nsf_research_open_siem","stargazers_count":0,"updated_at":"2026-06-27T08:20:13Z"},{"description":null,"fork":false,"html_url":"https://github.com/chouithegewy/nvim","language":"Lua","name":"nvim","stargazers_count":0,"updated_at":"2026-05-04T08:09:22Z"},{"description":"RSA implementation - CS4780 - Educational","fork":false,"html_url":"https://github.com/chouithegewy/rsakey","language":"Java","name":"rsakey","stargazers_count":0,"updated_at":"2026-05-03T10:01:46Z"},{"description":null,"fork":false,"html_url":"https://github.com/chouithegewy/zchilos","language":null,"name":"zchilos","stargazers_count":0,"updated_at":"2025-05-05T10:18:09Z"}]</script>
-<script>
-  const OWNER = "chouithegewy";
-  const baked = JSON.parse(document.getElementById("repo-data").textContent);
-  document.getElementById("yr").textContent = new Date().getFullYear();
-
-  const ORDER = ["Rust", "Java", "HTML", "Python", "Lua", "Shell"];
-  const fmt = (iso) => (iso || "").slice(0, 7);
-  const section = document.getElementById("repos");
-
-  // Render the repo index, grouped by language into Cargo.toml-style [deps.*]
-  // sections. Called first with baked data (instant paint), then again with
-  // fresh data from the GitHub API.
-  function render(repos) {
-    document.getElementById("repo-count").textContent = `"${repos.length}"`;
-    const groups = new Map();
-    for (const r of repos) {
-      const key = ORDER.includes(r.language) ? r.language : "misc";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(r);
-    }
-    const keys = [...ORDER.filter((k) => groups.has(k)), ...(groups.has("misc") ? ["misc"] : [])];
-
-    section.innerHTML = "";
-    for (const key of keys) {
-      const list = groups.get(key).sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
-      const div = document.createElement("div");
-      div.className = "group";
-      div.innerHTML = `<h2>[deps.<b>${key.toLowerCase()}</b>] · ${list.length}</h2><ul class="crates"></ul>`;
-      const ul = div.querySelector("ul");
-      for (const r of list) {
-        const li = document.createElement("li");
-        li.dataset.repo = r.name;
-        li.innerHTML = `
-          <span class="name"><a href="${r.html_url}"></a>${r.fork ? ' <span class="fork">(fork)</span>' : ""}</span>
-          <span class="desc"></span>
-          <span class="date">${fmt(r.updated_at)}</span>`;
-        li.querySelector(".name a").textContent = r.name;
-        li.querySelector(".desc").textContent = r.description ?? "";
-        wireReadme(li, r.name);
-        ul.appendChild(li);
-      }
-      section.appendChild(div);
-    }
-  }
-
-  // --- README reader pane: hover previews, click pins ---
-  const pane = document.getElementById("readme-pane");
-  const rpBody = document.getElementById("rp-body");
-  const rpPath = document.getElementById("rp-path");
-  const rpTag = document.getElementById("rp-tag");
-  const cache = new Map();
-  let pinned = null;
-  let hoverTimer = null;
-  let reqSeq = 0;
-
-  // Dark markdown styling for the sandboxed iframe — echoes the manifest card.
-  const READER_CSS = `
-    :root { color-scheme: dark; }
-    body { margin: 0; padding: 20px 22px 64px; background: #1d2833; color: #cdd9e3;
-      font: 14px/1.65 ui-sans-serif, system-ui, sans-serif; overflow-wrap: break-word; }
-    a { color: #f0a06c; } a:hover { color: #ffc39a; }
-    h1,h2,h3,h4,h5 { color: #eef3f7; line-height: 1.25; margin: 1.4em 0 .5em; }
-    h1 { font-size: 1.5em; } h2 { font-size: 1.25em; }
-    h1,h2 { border-bottom: 1px solid #33475a; padding-bottom: .3em; }
-    code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .88em;
-      background: #121a22; padding: .15em .4em; border-radius: 4px; }
-    pre { background: #121a22; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
-    pre code { background: none; padding: 0; }
-    img { max-width: 100%; height: auto; }
-    blockquote { margin: 0 0 1em; padding-left: 14px; border-left: 3px solid #3e5c76; color: #8fa8bd; }
-    table { border-collapse: collapse; } td, th { border: 1px solid #33475a; padding: 6px 10px; }
-    hr { border: none; border-top: 1px solid #33475a; margin: 1.5em 0; }`;
-
-  function frameDoc(html) {
-    return `<!doctype html><meta charset="utf-8"><base target="_blank"><style>${READER_CSS}</style><body>${html}</body>`;
-  }
-
-  function setBody(kind, content) {
-    if (kind === "frame") {
-      const f = document.createElement("iframe");
-      f.className = "rp-frame";
-      f.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
-      f.srcdoc = frameDoc(content);
-      rpBody.replaceChildren(f);
-    } else {
-      const p = document.createElement("p");
-      p.className = "rp-msg";
-      p.textContent = content;
-      rpBody.replaceChildren(p);
-    }
-  }
-
-  function highlight(name) {
-    section.querySelectorAll("li.active").forEach((el) => el.classList.remove("active"));
-    if (name) {
-      const li = section.querySelector(`li[data-repo="${CSS.escape(name)}"]`);
-      if (li) li.classList.add("active");
-    }
-  }
-
-  function closePane() {
-    pinned = null;
-    pane.classList.remove("open", "pinned");
-    pane.setAttribute("aria-hidden", "true");
-    highlight(null);
-  }
-
-  async function showReadme(name, pin) {
-    rpPath.textContent = `${OWNER}/${name}`;
-    rpTag.textContent = pin ? "pinned" : "preview";
-    pane.classList.toggle("pinned", pin);
-    pane.classList.add("open");
-    pane.setAttribute("aria-hidden", "false");
-    highlight(name);
-
-    if (cache.has(name)) {
-      const v = cache.get(name);
-      setBody(v.kind, v.content);
-      return;
-    }
-    const seq = ++reqSeq;
-    setBody("msg", "Loading README…");
-    let entry;
-    try {
-      const res = await fetch(`https://api.github.com/repos/${OWNER}/${name}/readme`, {
-        headers: { Accept: "application/vnd.github.html" },
-      });
-      if (res.status === 404) entry = { kind: "msg", content: "No README in this repo." };
-      else if (res.status === 403) entry = { kind: "msg", content: "GitHub rate limit reached — try again later." };
-      else if (!res.ok) entry = { kind: "msg", content: `Couldn't load README (HTTP ${res.status}).` };
-      else entry = { kind: "frame", content: await res.text() };
-    } catch {
-      entry = { kind: "msg", content: "Couldn't load README — network error." };
-    }
-    cache.set(name, entry);
-    if (seq === reqSeq) setBody(entry.kind, entry.content); // drop stale responses
-  }
-
-  function wireReadme(li, name) {
-    li.addEventListener("mouseenter", () => {
-      if (pinned) return;
-      clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(() => { if (!pinned) showReadme(name, false); }, 350);
-    });
-    li.addEventListener("mouseleave", () => {
-      clearTimeout(hoverTimer);
-      if (!pinned) closePane();
-    });
-    li.addEventListener("click", (e) => {
-      if (e.target.closest(".name a")) return; // let the GitHub link navigate
-      clearTimeout(hoverTimer);
-      pinned = name;
-      showReadme(name, true);
-    });
-  }
-
-  document.getElementById("rp-close").addEventListener("click", closePane);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePane(); });
-
-  // Instant paint from baked data, then refresh from the live API (best-effort:
-  // on rate-limit/offline the baked render silently stays).
-  render(baked);
-  (async () => {
-    try {
-      const res = await fetch(`https://api.github.com/users/${OWNER}/repos?per_page=100&sort=updated&type=owner`);
-      if (!res.ok) return;
-      const live = await res.json();
-      if (Array.isArray(live) && live.length) render(live);
-    } catch { /* keep baked */ }
-  })();
-</script>
+<footer class="contact">
+  <a href="https://github.com/chouithegewy">github.com/chouithegewy</a>
+  <a href="mailto:combatburrito@gmail.com">combatburrito@gmail.com</a>
+</footer>
 </body>
 </html>

@@ -24,5 +24,6 @@ HOST="${1:?usage: ./deploy.sh <ssh-user@host> [docroot]}"
 DOCROOT="${2:-/var/www/chilos.dev}"
 
 ssh "$HOST" "mkdir -p '$DOCROOT'"
-rsync -av --delete site/ "$HOST:$DOCROOT/"
+# Apps deployed separately (vr_fire, ssbm) live beside the site; never delete them.
+rsync -av --delete --exclude vr_fire/ --exclude ssbm/ site/ "$HOST:$DOCROOT/"
 echo "Deployed to $HOST:$DOCROOT"
