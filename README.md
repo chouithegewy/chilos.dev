@@ -9,7 +9,7 @@ the vr_fire capstone project. It's published in two places:
 
 ## Layout
 
-- `site/`: the deployable site (`index.html`, plus `tydle.html` and its assets)
+- `site/`: the deployable site (`index.html`, plus `tydle.html` and the `style.css` it uses)
 - `deploy.sh`: rsyncs `site/` to the server. It never deletes the separately
   deployed `vr_fire/` and `ssbm/` apps.
 - `.github/workflows/publish-github-pages.yml`: copies `site/` into the
