@@ -4,18 +4,18 @@
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawn, execFile } = require("node:child_process");
 const { once } = require("node:events");
 const { TydleClient } = require("../pkg/tydle.js");
 
 const PORT = process.env.PORT || 3311;
 const HOST = process.env.HOST || "127.0.0.1";
-// PO tokens (via the bgutil provider) are opt-in: set POT_PROVIDER_URL to a
-// running provider (e.g. http://127.0.0.1:4416) to enable them. Empty/unset =
-// off, which is correct when running from a residential IP that isn't bot-
-// checked (no token needed). We do NOT force the web client: web returns
-// signature-ciphered, frontend-unusable streams here, while tydle's default
-// selection yields androidVr's direct-URL audio.
+// Set this to a current yt-dlp executable to use maintained YouTube clients.
+// Older tydle builds select ANDROID_VR URLs that can reject later media bytes.
+const YT_DLP_PATH = process.env.YT_DLP_PATH;
+// Legacy WASM extraction can optionally use a bgutil PO-token provider.
+// This setting applies only when YT_DLP_PATH is unset; prefer the maintained
+// extractor for current YouTube client support.
 const client = new TydleClient({
   poTokenProviderUrl: process.env.POT_PROVIDER_URL || "",
 });
@@ -53,7 +53,51 @@ function withClient(fn) {
   return job;
 }
 
-function extract(videoId) {
+async function extractWithYtDlp(videoId, signal) {
+  const output = await new Promise((resolve, reject) => {
+    execFile(YT_DLP_PATH, [
+      "--ignore-config", "--no-playlist", "--no-warnings",
+      "--js-runtimes", `node:${process.execPath}`,
+      "--socket-timeout", "15", "--retries", "1", "--extractor-retries", "1",
+      "--format", "bestaudio[protocol=https]/bestaudio[protocol=http]",
+      "--dump-single-json", `https://www.youtube.com/watch?v=${videoId}`,
+    ], { signal, timeout: 45_000, maxBuffer: 8 * 1024 * 1024 }, (error, stdout) => {
+      if (error) {
+        if (signal?.aborted) return reject(signal.reason);
+        return reject(new Error(error.code === "ENOENT"
+          ? "The YouTube download extractor is unavailable."
+          : "YouTube extraction failed. The video may be unavailable; please try again."));
+      }
+      resolve(stdout);
+    });
+  });
+  const data = JSON.parse(output);
+  const url = new URL(data.url);
+  if (!["https:", "http:"].includes(url.protocol) || !data.acodec || data.acodec === "none" ||
+      (data.vcodec && data.vcodec !== "none")) {
+    throw new Error("No downloadable audio stream found for this video.");
+  }
+  const duration = Number(url.searchParams.get("dur")) || data.duration;
+  return {
+    info: {
+      title: data.title,
+      channel: { name: data.channel ?? data.uploader ?? "" },
+      duration: data.duration,
+      thumbnails: data.thumbnails ?? (data.thumbnail ? [{ url: data.thumbnail }] : []),
+    },
+    audio: {
+      source: { url: data.url, headers: data.http_headers ?? {} },
+      codec: { acodec: data.acodec },
+      ext: data.ext,
+      fileSize: data.filesize,
+      tbr: (data.abr ?? data.tbr ?? 0) * 1000,
+      formatDuration: duration * 1000,
+    },
+  };
+}
+
+function extract(videoId, signal) {
+  if (YT_DLP_PATH) return extractWithYtDlp(videoId, signal);
   return withClient(async () => {
     const info = await client.fetchVideoInfo(videoId);
     const { streams } = await client.fetchStreams(videoId);
@@ -108,7 +152,7 @@ async function pipeSourceToFfmpeg(audio, dest, signal) {
     while (start < sourceSize) {
       const requestedEnd = Math.min(start + CHUNK_SIZE, sourceSize) - 1;
       const r = await fetch(audio.source.url, {
-        headers: { Range: `bytes=${start}-${requestedEnd}` },
+        headers: { ...audio.source.headers, Range: `bytes=${start}-${requestedEnd}` },
         signal,
       });
       if (!r.ok) throw new Error(`YouTube stream request failed (HTTP ${r.status}).`);
@@ -155,7 +199,7 @@ async function pipeSourceToFfmpeg(audio, dest, signal) {
       start = rangeEnd + 1;
     }
   } else {
-    const r = await fetch(audio.source.url, { signal });
+    const r = await fetch(audio.source.url, { headers: audio.source.headers, signal });
     if (!r.ok) throw new Error(`YouTube stream request failed (HTTP ${r.status}).`);
     const lengthHeader = r.headers.get("Content-Length");
     const contentLength = lengthHeader == null ? null : Number(lengthHeader);
@@ -173,10 +217,17 @@ function estimateMp3Bytes(audio) {
 }
 
 async function handleDownload(res, videoId) {
-  const { info, audio } = await extract(videoId);
   const controller = new AbortController();
+  let ffmpeg;
+  res.on("close", () => {
+    if (res.writableEnded) return;
+    controller.abort();
+    if (ffmpeg && !ffmpeg.killed) ffmpeg.kill("SIGKILL");
+  });
+  const { info, audio } = await extract(videoId, controller.signal);
+  controller.signal.throwIfAborted();
 
-  const ffmpeg = spawn("ffmpeg", [
+  ffmpeg = spawn("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-xerror", "-abort_on", "empty_output",
     "-i", "pipe:0",
     "-vn", "-c:a", "libmp3lame", "-q:a", "0",
@@ -189,11 +240,20 @@ async function handleDownload(res, videoId) {
     "-f", "mp3", "pipe:1",
   ], { stdio: ["pipe", "pipe", "inherit"] });
 
-  res.writeHead(200, {
+  const headers = {
     "Content-Type": "audio/mpeg",
     "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(sanitizeFilename(info.title))}.mp3`,
     "X-Estimated-Content-Length": String(estimateMp3Bytes(audio)),
-  });
+  };
+
+  // Delay the MP3 headers until there is output. Failures before streaming can
+  // then return JSON instead of making nginx generate an opaque 502 page.
+  ffmpeg.stdout.once("data", () => res.writeHead(200, headers));
+  const fail = (err) => {
+    if (res.destroyed || res.writableEnded) return;
+    if (res.headersSent) res.destroy(err);
+    else sendJson(res, 502, { error: err.message ?? "Download failed." });
+  };
 
   let processError = null;
   let sourceError = null;
@@ -203,7 +263,7 @@ async function handleDownload(res, videoId) {
     processError = err;
     controller.abort();
     console.error(err);
-    if (!res.destroyed) res.destroy(err);
+    fail(err);
   });
   ffmpeg.stdin.on("error", (err) => {
     stdinError = err;
@@ -214,7 +274,7 @@ async function handleDownload(res, videoId) {
     processError ??= err;
     controller.abort();
     console.error(err);
-    if (!res.destroyed) res.destroy(err);
+    fail(err);
   });
 
   // Do not let stdout's end event mark a failed or truncated transcode as a
@@ -236,13 +296,7 @@ async function handleDownload(res, videoId) {
       return;
     }
     const err = sourceError ?? processError ?? stdinError ?? new Error(`ffmpeg exited with code ${code}`);
-    if (!res.destroyed) res.destroy(err);
-  });
-
-  res.on("close", () => {
-    if (res.writableEnded) return;
-    controller.abort();
-    if (!ffmpeg.killed) ffmpeg.kill("SIGKILL");
+    fail(err);
   });
 }
 

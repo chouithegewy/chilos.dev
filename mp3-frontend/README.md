@@ -11,11 +11,17 @@ downloads.
 - The wasm package built at `../pkg` (`wasm-pack build --target nodejs --out-name tydle --scope wvlen --out-dir pkg --release --no-default-features --features cipher`)
 - `ffmpeg` on PATH
 - Node 18+
+- For the hosted app: yt-dlp 2026.08.19 or newer and Node 22+ for its JavaScript
+  runtime. Set `YT_DLP_PATH` to the executable. This avoids the older WASM
+  extractor's ANDROID_VR media URLs, which YouTube can reject with HTTP 403
+  ([upstream issue](https://github.com/yt-dlp/yt-dlp/issues/17456)).
 
 ## Run
 
 ```sh
 node server.js        # http://localhost:3311  (PORT env var to change)
+# Recommended extraction backend:
+YT_DLP_PATH=/absolute/path/to/yt-dlp node server.js
 ```
 
 ## How it works
@@ -25,6 +31,21 @@ extract streams, picks the highest-bitrate audio-only stream (preferring
 webm/opus, which ffmpeg demuxes reliably from a pipe), and pipes it through
 `ffmpeg -c:a libmp3lame -q:a 0` (~245 kbps VBR) straight to the browser with
 title/artist ID3 tags set.
+
+When `YT_DLP_PATH` is set, a yt-dlp subprocess selects the best direct HTTP audio
+stream and returns metadata instead. The Node server still fetches the source
+in checked ranges and streams ffmpeg's MP3 output. Extractor HTTP headers are
+preserved. Configuration files are ignored, requests select one video, and
+extraction has a 45-second deadline. Disconnecting a download cancels extraction.
+Failures before any MP3 output return a readable JSON error; failures after
+streaming begins abort the response so the browser cannot save a partial file.
+
+The hosted service sets `YT_DLP_PATH` in a systemd user-service drop-in. After
+changing the executable path, run `systemctl --user daemon-reload` and restart
+`tydle-deck.service`. Keep the previous executable available for rollback.
+
+See [the architecture diagrams](architecture.md) for the current deployment
+and the proposed Tor/Veilid design.
 
 Calls into the wasm client are serialized through a queue: concurrent calls on
 one `TydleClient` panic the wasm module (std Mutex held across an await —

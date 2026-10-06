@@ -12,9 +12,9 @@ const audio = {
   codec: { acodec: "opus" }, ext: "webm", formatDuration: 1000,
 };
 
-function loadServer(fetch, spawn) {
+function loadServer(fetch, spawn, { env = {}, execFile } = {}) {
   const context = vm.createContext({
-    AbortController, URL, fetch, process: { env: {} }, __dirname,
+    AbortController, URL, fetch, process: { env, execPath: process.execPath }, __dirname,
     console: { log() {}, error() {} },
     require(id) {
       if (id === "../pkg/tydle.js") return { TydleClient: class {
@@ -22,12 +22,12 @@ function loadServer(fetch, spawn) {
         async fetchStreams() { return { streams: [audio] }; }
       } };
       if (id === "node:http") return { createServer: () => ({ listen() {} }) };
-      if (id === "node:child_process") return { spawn };
+      if (id === "node:child_process") return { spawn, execFile };
       return require(id);
     },
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "server.js"), "utf8") +
-    "\nglobalThis.api = { pipeSourceToFfmpeg, handleDownload };", context);
+    "\nglobalThis.api = { extract, pipeSourceToFfmpeg, handleDownload };", context);
   return context.api;
 }
 
@@ -42,8 +42,14 @@ function response(status, headers, bytes) {
 function destination() {
   const chunks = [];
   const stream = new Writable({ write(chunk, encoding, callback) {
+    stream.headersSent = true;
     chunks.push(Buffer.from(chunk)); callback();
   } });
+  stream.headersSent = false;
+  stream.writeHead = (status, headers) => {
+    stream.statusCode = status;
+    stream.responseHeaders = headers;
+  };
   stream.bytes = () => Buffer.concat(chunks).toString();
   return stream;
 }
@@ -109,7 +115,6 @@ for (const exitCode of [0, 1]) {
     const child = fakeFfmpeg();
     const api = loadServer(async () => response(206, { "Content-Range": "bytes 0-3/4" }, "abcd"), () => child);
     const res = destination();
-    res.writeHead = () => {};
     const errors = [];
     res.on("error", (error) => errors.push(error));
     await api.handleDownload(res, "example");
@@ -133,7 +138,6 @@ test("disconnect cancels source fetching and terminates ffmpeg", async () => {
     return new Promise((resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason)));
   }, () => child);
   const res = destination();
-  res.writeHead = () => {};
   res.on("error", () => {});
   await api.handleDownload(res, "example");
   res.destroy();
@@ -142,18 +146,91 @@ test("disconnect cancels source fetching and terminates ffmpeg", async () => {
   assert.equal(child.killed, true);
 });
 
-test("a truncated source fails the HTTP response and terminates ffmpeg", async () => {
+test("a truncated source returns a readable error before output and terminates ffmpeg", async () => {
   const child = fakeFfmpeg();
   const api = loadServer(async () => response(206, { "Content-Range": "bytes 0-3/4" }, "abc"), () => child);
   const res = destination();
-  res.writeHead = () => {};
   const errors = [];
   res.on("error", (error) => errors.push(error));
   await api.handleDownload(res, "example");
   await tick();
-  assert.equal(res.writableEnded, false);
+  assert.equal(res.writableEnded, true);
   assert.equal(child.killed, true);
-  assert.match(errors[0].message, /Incomplete YouTube range/);
+  assert.equal(errors.length, 0);
+  assert.equal(res.statusCode, 502);
+  assert.match(JSON.parse(res.bytes()).error, /Incomplete YouTube range/);
+});
+
+test("a rejected YouTube source returns JSON instead of closing before HTTP headers", async () => {
+  const child = fakeFfmpeg();
+  const api = loadServer(async () => response(403, {}, ""), () => child);
+  const res = destination();
+  await api.handleDownload(res, "example");
+  await tick();
+  assert.equal(res.statusCode, 502);
+  assert.equal(res.responseHeaders["Content-Type"], "application/json");
+  assert.match(JSON.parse(res.bytes()).error, /YouTube stream request failed \(HTTP 403\)/);
+  assert.equal(child.killed, true);
+});
+
+test("configured yt-dlp provides a complete source with its required request headers", async () => {
+  const bytes = Buffer.alloc(1024 * 1024, "a");
+  const sourceUrl = "https://media.example/audio?dur=236.041";
+  const api = loadServer(async (url, options) => {
+    assert.equal(url, sourceUrl);
+    assert.equal(options.headers["User-Agent"], "extractor-agent");
+    assert.equal(options.headers.Range, `bytes=0-${bytes.length - 1}`);
+    return response(206, { "Content-Range": `bytes 0-${bytes.length - 1}/${bytes.length}` }, bytes);
+  }, undefined, {
+    env: { YT_DLP_PATH: "/test/yt-dlp" },
+    execFile(file, args, options, callback) {
+      assert.equal(file, "/test/yt-dlp");
+      assert.ok(args.includes("--ignore-config"));
+      assert.ok(args.includes(`node:${process.execPath}`));
+      assert.ok(args.includes("bestaudio[protocol=https]/bestaudio[protocol=http]"));
+      assert.equal(args.at(-1), "https://www.youtube.com/watch?v=FmA8gUGAvUQ");
+      assert.equal(options.timeout, 45_000);
+      callback(null, JSON.stringify({
+        title: "Santa Fe Klan - Así Soy", channel: "Santa Fe Klan", duration: 236,
+        url: sourceUrl, ext: "webm", acodec: "opus", vcodec: "none", abr: 131,
+        filesize: bytes.length, http_headers: { "User-Agent": "extractor-agent" },
+      }));
+    },
+  });
+  const extracted = await api.extract("FmA8gUGAvUQ");
+  assert.equal(extracted.info.title, "Santa Fe Klan - Así Soy");
+  assert.equal(extracted.audio.formatDuration, 236041);
+  assert.equal(extracted.audio.tbr, 131000);
+  const dest = destination();
+  await api.pipeSourceToFfmpeg(extracted.audio, dest);
+  assert.equal(dest.bytes().length, bytes.length);
+  assert.equal(dest.writableEnded, true);
+});
+
+test("extractor failures do not leak command details into the browser error", async () => {
+  const api = loadServer(undefined, undefined, {
+    env: { YT_DLP_PATH: "/test/yt-dlp" },
+    execFile(file, args, options, callback) {
+      callback(new Error("command failed with private source URL"));
+    },
+  });
+  await assert.rejects(api.extract("example"), /YouTube extraction failed/);
+});
+
+test("disconnect during extraction cancels the subprocess without starting ffmpeg", async () => {
+  let signal;
+  const api = loadServer(undefined, () => assert.fail("ffmpeg must not start"), {
+    env: { YT_DLP_PATH: "/test/yt-dlp" },
+    execFile(file, args, options, callback) {
+      signal = options.signal;
+      signal.addEventListener("abort", () => callback(new Error("aborted")));
+    },
+  });
+  const res = destination();
+  const download = api.handleDownload(res, "example");
+  res.destroy();
+  await assert.rejects(download, /aborted/i);
+  assert.equal(signal.aborted, true);
 });
 
 function loadBrowser(fetch) {
