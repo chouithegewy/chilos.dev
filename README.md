@@ -9,12 +9,13 @@ the vr_fire capstone project. It's published in two places:
 
 ## Layout
 
-- `site/`: the deployable site (`index.html`, plus `tydle.html` and the `style.css` it uses)
+- `site/`: the deployable static home page and assets
 - `deploy.sh`: rsyncs `site/` to the server. It never deletes the separately
   deployed `vr_fire/` and `ssbm/` apps.
 - `.github/workflows/publish-github-pages.yml`: copies `site/` into the
   `chouithegewy.github.io` repo, leaving its `frogger3d/` folder alone
-- `repos.json`, `mp3-frontend/`: from the earlier repo-index version of the site
+- `mp3-frontend/`: the MP3 app served separately at `/tydle/` through the VPS reverse proxy
+- `repos.json`: from the earlier repo-index version of the site
 
 ## Publishing
 
