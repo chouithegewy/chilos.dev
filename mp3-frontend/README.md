@@ -68,6 +68,15 @@ for mobile download managers to consume it.
 Playlists are enumerated from YouTube page data (`ytInitialData`), not tydle:
 `/playlist` for regular lists, the watch page's playlist panel for RD mixes.
 
+## Network model
+
+A reverse SSH tunnel only carries incoming browser requests to this server.
+YouTube extraction and media fetching still run here, so YouTube sees this
+server's public IP, not the visitor's IP. Using each visitor's IP requires a
+client-side or locally installed extractor/transcoder; forwarding an
+`X-Forwarded-For` header can preserve an address for logging or rate limiting,
+but cannot change the source IP of this server's outbound requests.
+
 ## Verify download completion
 
 ```sh

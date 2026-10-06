@@ -37,7 +37,7 @@ Then delete the old key under the Pages repo's **Settings → Deploy keys**.
 **chilos.dev** (the VPS):
 
 ```sh
-./deploy.sh thehomiedavid@chilos.dev /var/www/chilos.dev
+./deploy.sh ssh-user@server.example /var/www/example-site
 ```
 
 ## Preview locally
