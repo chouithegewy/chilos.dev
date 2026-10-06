@@ -5,6 +5,7 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const { once } = require("node:events");
 const { TydleClient } = require("../pkg/tydle.js");
 
 const PORT = process.env.PORT || 3311;
@@ -89,23 +90,79 @@ async function handleInfo(res, videoId) {
 // so fetch the source in 10 MiB chunks.
 const CHUNK_SIZE = 10 * 1024 * 1024;
 
-async function pipeSourceToFfmpeg(audio, dest) {
+async function pipeSourceToFfmpeg(audio, dest, signal) {
   const write = async (body) => {
+    if (!body) throw new Error("YouTube returned an empty response body.");
+    let bytes = 0;
     for await (const chunk of body) {
-      if (!dest.write(chunk)) await new Promise((r) => dest.once("drain", r));
+      bytes += chunk.length;
+      if (!dest.write(chunk)) await once(dest, "drain", { signal });
     }
+    return bytes;
   };
-  if (audio.fileSize) {
-    for (let start = 0; start < audio.fileSize; start += CHUNK_SIZE) {
-      const end = Math.min(start + CHUNK_SIZE, audio.fileSize) - 1;
-      const r = await fetch(audio.source.url, { headers: { Range: `bytes=${start}-${end}` } });
+
+  let sourceSize = Number(audio.fileSize);
+  if (Number.isSafeInteger(sourceSize) && sourceSize > 0) {
+    let start = 0;
+    let rangeSize = null;
+    while (start < sourceSize) {
+      const requestedEnd = Math.min(start + CHUNK_SIZE, sourceSize) - 1;
+      const r = await fetch(audio.source.url, {
+        headers: { Range: `bytes=${start}-${requestedEnd}` },
+        signal,
+      });
       if (!r.ok) throw new Error(`YouTube stream request failed (HTTP ${r.status}).`);
-      await write(r.body);
+
+      // Some origins ignore Range and return the complete file. Accept that
+      // only for the first request so the source cannot be duplicated.
+      if (r.status === 200 && start === 0) {
+        const lengthHeader = r.headers.get("Content-Length");
+        const contentLength = lengthHeader == null ? sourceSize : Number(lengthHeader);
+        const received = await write(r.body);
+        if (Number.isSafeInteger(contentLength) && received !== contentLength) {
+          throw new Error(`Incomplete YouTube stream (${received} of ${contentLength} bytes).`);
+        }
+        dest.end();
+        return;
+      }
+      if (r.status !== 206) {
+        throw new Error(`YouTube ignored a range request at byte ${start}.`);
+      }
+
+      const contentRange = r.headers.get("Content-Range") ?? "";
+      const match = contentRange.match(/^bytes (\d+)-(\d+)\/(\d+|\*)$/i);
+      if (!match) throw new Error("YouTube returned an invalid ranged stream response.");
+      const rangeStart = Number(match[1]);
+      const rangeEnd = Number(match[2]);
+      const reportedSize = match[3] === "*" ? null : Number(match[3]);
+      if (!Number.isSafeInteger(rangeStart) || !Number.isSafeInteger(rangeEnd) ||
+          rangeStart !== start || rangeEnd < rangeStart || rangeEnd > requestedEnd) {
+        throw new Error(`Unexpected YouTube byte range ${rangeStart}-${rangeEnd}.`);
+      }
+      if (reportedSize !== null) {
+        if (!Number.isSafeInteger(reportedSize) || reportedSize <= rangeEnd ||
+            (rangeSize !== null && reportedSize !== rangeSize)) {
+          throw new Error("Unexpected YouTube stream size in Content-Range.");
+        }
+        rangeSize = sourceSize = reportedSize;
+      }
+
+      const expected = rangeEnd - rangeStart + 1;
+      const received = await write(r.body);
+      if (received !== expected) {
+        throw new Error(`Incomplete YouTube range (${received} of ${expected} bytes).`);
+      }
+      start = rangeEnd + 1;
     }
   } else {
-    const r = await fetch(audio.source.url);
+    const r = await fetch(audio.source.url, { signal });
     if (!r.ok) throw new Error(`YouTube stream request failed (HTTP ${r.status}).`);
-    await write(r.body);
+    const lengthHeader = r.headers.get("Content-Length");
+    const contentLength = lengthHeader == null ? null : Number(lengthHeader);
+    const received = await write(r.body);
+    if (Number.isSafeInteger(contentLength) && received !== contentLength) {
+      throw new Error(`Incomplete YouTube stream (${received} of ${contentLength} bytes).`);
+    }
   }
   dest.end();
 }
@@ -117,9 +174,10 @@ function estimateMp3Bytes(audio) {
 
 async function handleDownload(res, videoId) {
   const { info, audio } = await extract(videoId);
+  const controller = new AbortController();
 
   const ffmpeg = spawn("ffmpeg", [
-    "-hide_banner", "-loglevel", "error",
+    "-hide_banner", "-loglevel", "error", "-xerror", "-abort_on", "empty_output",
     "-i", "pipe:0",
     "-vn", "-c:a", "libmp3lame", "-q:a", "0",
     "-metadata", `title=${info.title}`,
@@ -137,16 +195,55 @@ async function handleDownload(res, videoId) {
     "X-Estimated-Content-Length": String(estimateMp3Bytes(audio)),
   });
 
-  ffmpeg.stdin.on("error", () => {});
-  pipeSourceToFfmpeg(audio, ffmpeg.stdin).catch((err) => {
+  let processError = null;
+  let sourceError = null;
+  let stdinError = null;
+
+  ffmpeg.on("error", (err) => {
+    processError = err;
+    controller.abort();
     console.error(err);
-    ffmpeg.kill("SIGKILL");
+    if (!res.destroyed) res.destroy(err);
   });
-  ffmpeg.stdout.pipe(res);
-  ffmpeg.on("close", (code) => {
-    if (code !== 0) res.destroy(new Error(`ffmpeg exited with code ${code}`));
+  ffmpeg.stdin.on("error", (err) => {
+    stdinError = err;
+    controller.abort();
+    if (err.code !== "EPIPE") console.error(err);
   });
-  res.on("close", () => ffmpeg.kill("SIGKILL"));
+  ffmpeg.stdout.on("error", (err) => {
+    processError ??= err;
+    controller.abort();
+    console.error(err);
+    if (!res.destroyed) res.destroy(err);
+  });
+
+  // Do not let stdout's end event mark a failed or truncated transcode as a
+  // successful HTTP response. Only a clean ffmpeg exit may end the response.
+  ffmpeg.stdout.pipe(res, { end: false });
+  const source = pipeSourceToFfmpeg(audio, ffmpeg.stdin, controller.signal).catch((err) => {
+    sourceError = err;
+    controller.abort();
+    console.error(err);
+    ffmpeg.stdin.destroy();
+    if (!ffmpeg.killed) ffmpeg.kill("SIGKILL");
+  });
+
+  ffmpeg.on("close", async (code) => {
+    controller.abort();
+    await source;
+    if (code === 0 && !sourceError && !processError && !stdinError) {
+      res.end();
+      return;
+    }
+    const err = sourceError ?? processError ?? stdinError ?? new Error(`ffmpeg exited with code ${code}`);
+    if (!res.destroyed) res.destroy(err);
+  });
+
+  res.on("close", () => {
+    if (res.writableEnded) return;
+    controller.abort();
+    if (!ffmpeg.killed) ffmpeg.kill("SIGKILL");
+  });
 }
 
 // Playlists aren't part of tydle's API; enumerate them from YouTube's page

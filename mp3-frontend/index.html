@@ -271,11 +271,15 @@
     setProgress(on ? 0 : null, label ?? "");
   }
 
-  // pct null clears the bar; label goes bottom-left, detail bottom-right
-  function setProgress(pct, label, detail) {
-    $("fill").style.width = pct == null ? "0%" : Math.min(pct * 100, 99) + "%";
+  // pct null clears the bar; label goes bottom-left, detail bottom-right.
+  // Estimates stay below 100% until the response stream has actually ended.
+  function setProgress(pct, label, detail, complete = false) {
+    const percent = pct == null
+      ? 0
+      : Math.min(Math.max(Math.round(pct * 100), 0), complete ? 100 : 99);
+    $("fill").style.width = `${percent}%`;
     $("stLeft").textContent = label ?? "";
-    $("stPct").textContent = pct == null ? "" : Math.min(Math.round(pct * 100), 99) + "%";
+    $("stPct").textContent = pct == null ? "" : `${percent}%`;
     $("stRight").textContent = detail ?? "";
   }
 
@@ -315,11 +319,19 @@
       }
     }
     const blob = new Blob(chunks, { type: "audio/mpeg" });
+    const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = objectUrl;
     a.download = filename;
+    a.hidden = true;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    // Mobile download managers may consume blob URLs asynchronously. Revoking
+    // immediately can leave them with an empty or truncated file.
+    setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    }, 30_000);
     return filename;
   }
 
@@ -387,8 +399,7 @@
     setBusy(true, "ripping…");
     try {
       await downloadOne(current.url, "ripping…");
-      setProgress(1, "saved", "");
-      $("fill").style.width = "100%";
+      setProgress(1, "saved", "", true);
     } catch (err) {
       $("msg").textContent = err.message;
       setProgress(null, "");
@@ -425,8 +436,7 @@
         }
         li.classList.remove("active");
       }
-      setProgress(1, "playlist done", failed ? `${failed} failed` : "");
-      $("fill").style.width = "100%";
+      setProgress(1, "playlist done", failed ? `${failed} failed` : "", true);
       if (failed) $("msg").textContent = `${failed} track(s) failed — see the list.`;
     } finally {
       busy = false;
